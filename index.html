@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CIRCUIT AGENT — Electronics Decision Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --phosphor: #00ff88;
+      --phosphor-dim: #00cc66;
+      --phosphor-glow: rgba(0, 255, 136, 0.3);
+      --phosphor-faint: rgba(0, 255, 136, 0.07);
+      --chassis: #0d0f0e;
+      --panel: #111412;
+      --panel-raised: #161a17;
+      --panel-border: #2a3028;
+      --amber: #ffb347;
+      --amber-dim: #cc8a30;
+      --red: #ff4444;
+      --red-dim: #cc2222;
+      --blue: #44aaff;
+      --text-dim: #4a7a5a;
+      --text-mid: #7aaa8a;
+      --scanline-opacity: 0.03;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--chassis);
+      color: var(--phosphor);
+      font-family: 'Share Tech Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    /* CRT scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,var(--scanline-opacity)) 2px,
+        rgba(0,0,0,var(--scanline-opacity)) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* CRT vignette */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .chassis {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+      animation: fadeIn 0.8s ease;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-label {
+      font-family: 'VT323', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+
+    .brand-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--phosphor);
+      text-shadow: 0 0 20px var(--phosphor-glow), 0 0 40px rgba(0,255,136,0.15);
+      letter-spacing: 3px;
+    }
+
+    .brand-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      margin-top: 2px;
+    }
+
+    /* POWER TOGGLE */
+    .power-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .power-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .power-toggle {
+      position: relative;
+      width: 64px;
+      height: 34px;
+      cursor: pointer;
+    }
+
+    .power-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .power-slider {
+      position: absolute;
+      inset: 0;
+      background: #0a0c0b;
+      border: 2px solid #2a3028;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 6px;
+    }
+
+    .power-slider::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      width: 22px;
+      height: 22px;
+      background: #1a1e1c;
+      border: 2px solid #3a4a38;
+      border-radius: 3px;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .power-slider::after {
+      content: 'OFF';
+      position: absolute;
+      right: 5px;
+      font-size: 8px;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace;
+      transition: opacity 0.3s;
+    }
+
+    input:checked ~ .power-slider {
+      background: rgba(0,255,136,0.08);
+      border-color: var(--phosphor-dim);
+      box-shadow: 0 0 12px rgba(0,255,136,0.2), inset 0 0 8px rgba(0,255,136,0.05);
+    }
+
+    input:checked ~ .power-slider::before {
+      transform: translateX(28px);
+      background: var(--phosphor);
+      border-color: var(--phosphor);
+      box-shadow: 0 0 10px var(--phosphor-glow);
+    }
+
+    input:checked ~ .power-slider::after {
+      content: 'ON';
+      color: var(--phosphor);
+      right: auto;
+      left: 5px;
+    }
+
+    .power-status {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--red);
+      text-transform: uppercase;
+      transition: color 0.3s;
+    }
+
+    .power-status.on { color: var(--phosphor); text-shadow: 0 0 8px var(--phosphor-glow); }
+
+    /* STATUS BAR */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      padding: 8px 16px;
+      margin-bottom: 20px;
+      font-size: 11px;
+      animation: fadeIn 0.6s ease 0.2s both;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 4px var(--red);
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+
+    .status-dot.active {
+      background: var(--phosphor);
+      box-shadow: 0 0 8px var(--phosphor-glow);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .status-text { color: var(--text-mid); flex: 1; }
+    .status-time { color: var(--text-dim); font-size: 10px; }
+
+    /* MAIN GRID */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 16px;
+      animation: fadeIn 0.8s ease 0.3s both;
+    }
+
+    @media (max-width: 680px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* PANELS */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      overflow: hidden;
+      transition: opacity 0.4s, filter 0.4s;
+    }
+
+    .panel.disabled {
+      opacity: 0.3;
+      pointer-events: none;
+      filter: grayscale(0.5);
+    }
+
+    .panel-header {
+      background: var(--panel-raised);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-header-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--phosphor-dim);
+      box-shadow: 0 0 6px var(--phosphor-glow);
+    }
+
+    .panel-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--text-mid);
+      text-transform: uppercase;
+    }
+
+    .panel-body { padding: 14px; }
+
+    /* CALCULATOR */
+    .calc-type-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 5px 8px;
+      background: transparent;
+      border: 1px solid var(--panel-border);
+      color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .tab:hover { border-color: var(--phosphor-dim); color: var(--text-mid); }
+    .tab.active {
+      background: rgba(0,255,136,0.08);
+      border-color: var(--phosphor);
+      color: var(--phosphor);
+      text-shadow: 0 0 8px var(--phosphor-glow);
+    }
+
+    /* INPUTS */
+    .field-group { margin-bottom: 12px; }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .field-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .field-input {
+      width: 100%;
+      background: #0a0c0b;
+      border: 1px solid var(--panel-border);
+      color: var(--phosphor);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      padding: 7px 10px;
+      border-radius: 3px;
+      outline: none;
+      transition: all 0.2s;
+      -moz-appearance: textfield;
+    }
+
+    .field-input::-webkit-outer-spin-button,
+    .field-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .field-input:focus {
+      border-color: var(--phosphor-dim);
+      box-shadow: 0 0 10px rgba(0,255,136,0.1);
+      background: rgba(0,255,136,0.03);
+    }
+
+    .field-input::placeholder { color: var(--text-dim); }
+
+    .field-select {
+      width: 100%;
+      background: #0a0c0b;
+      border: 1px solid var(--panel-border);
+      color: var(--text-mid);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      padding: 7px 10px;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      appearance: none;
+    }
+
+    .field-select:focus { border-color: var(--phosphor-dim); box-shadow: 0 0 10px rgba(0,255,136,0.1); }
+
+    .calc-btn {
+      width: 100%;
+      padding: 10px;
+      background: rgba(0,255,136,0.06);
+      border: 1px solid var(--phosphor-dim);
+      color: var(--phosphor);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+      margin-top: 4px;
+    }
+
+    .calc-btn:hover {
+      background: rgba(0,255,136,0.14);
+      box-shadow: 0 0 16px rgba(0,255,136,0.2);
+    }
+
+    .calc-btn:active { transform: scale(0.98); }
+
+    /* RESULT DISPLAY */
+    .result-display {
+      background: #080a09;
+      border: 1px solid var(--panel-border);
+      border-radius: 3px;
+      padding: 12px 14px;
+      margin-top: 12px;
+      min-height: 64px;
+      font-size: 11px;
+      line-height: 1.8;
+      color: var(--text-dim);
+      font-family: 'VT323', monospace;
+      font-size: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .result-display::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(0,255,136,0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .result-value {
+      color: var(--amber);
+      font-size: 28px;
+      font-family: 'VT323', monospace;
+      text-shadow: 0 0 10px rgba(255,179,71,0.4);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .result-label { color: var(--text-mid); font-size: 13px; }
+    .result-detail { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+
+    .result-error { color: var(--red); font-size: 14px; }
+
+    /* AGENT PANEL */
+    .agent-panel { grid-column: 1 / -1; }
+
+    .agent-chat {
+      height: 220px;
+      overflow-y: auto;
+      background: #080a09;
+      border: 1px solid var(--panel-border);
+      border-radius: 3px;
+      padding: 12px;
+      margin-bottom: 10px;
+      font-family: 'VT323', monospace;
+      font-size: 15px;
+      scroll-behavior: smooth;
+    }
+
+    .agent-chat::-webkit-scrollbar { width: 4px; }
+    .agent-chat::-webkit-scrollbar-track { background: transparent; }
+    .agent-chat::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+    .chat-line {
+      margin-bottom: 6px;
+      animation: lineAppear 0.3s ease;
+      line-height: 1.4;
+    }
+
+    @keyframes lineAppear {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-line .prompt { color: var(--phosphor-dim); margin-right: 6px; }
+    .chat-line.agent { color: var(--amber); }
+    .chat-line.agent .prompt { color: var(--amber-dim); }
+    .chat-line.system { color: var(--text-dim); }
+    .chat-line.error { color: var(--red); }
+    .chat-line.success { color: var(--phosphor); }
+
+    .agent-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .agent-input {
+      flex: 1;
+      background: #0a0c0b;
+      border: 1px solid var(--panel-border);
+      color: var(--phosphor);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      padding: 8px 12px;
+      border-radius: 3px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .agent-input:focus { border-color: var(--phosphor-dim); box-shadow: 0 0 10px rgba(0,255,136,0.1); }
+    .agent-input::placeholder { color: var(--text-dim); }
+
+    .send-btn {
+      padding: 8px 16px;
+      background: rgba(0,255,136,0.06);
+      border: 1px solid var(--phosphor-dim);
+      color: var(--phosphor);
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .send-btn:hover { background: rgba(0,255,136,0.14); box-shadow: 0 0 12px rgba(0,255,136,0.2); }
+
+    /* METERS PANEL */
+    .meters-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .meter-box {
+      background: #080a09;
+      border: 1px solid var(--panel-border);
+      border-radius: 3px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .meter-name {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .meter-value {
+      font-family: 'VT323', monospace;
+      font-size: 32px;
+      color: var(--amber);
+      text-shadow: 0 0 12px rgba(255,179,71,0.35);
+      line-height: 1;
+      transition: all 0.5s;
+    }
+
+    .meter-unit {
+      font-size: 10px;
+      color: var(--text-mid);
+      margin-top: 2px;
+      letter-spacing: 1px;
+    }
+
+    .meter-bar {
+      height: 3px;
+      background: var(--panel-border);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .meter-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--phosphor-dim), var(--amber));
+      border-radius: 2px;
+      transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 0 6px rgba(255,179,71,0.4);
+    }
+
+    /* OHMS LAW DIAGRAM */
+    .ohm-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 12px;
+      font-family: 'VT323', monospace;
+    }
+
+    .ohm-circle {
+      width: 70px;
+      height: 70px;
+      border: 2px solid var(--panel-border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: relative;
+      background: #080a09;
+      transition: all 0.3s;
+    }
+
+    .ohm-circle.highlight {
+      border-color: var(--phosphor);
+      box-shadow: 0 0 16px var(--phosphor-glow);
+    }
+
+    .ohm-circle-letter {
+      font-size: 28px;
+      color: var(--amber);
+      text-shadow: 0 0 8px rgba(255,179,71,0.4);
+      line-height: 1;
+    }
+
+    .ohm-circle-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1;
+    }
+
+    .ohm-eq {
+      font-size: 20px;
+      color: var(--phosphor-dim);
+      margin: 0 6px;
+    }
+
+    /* FORMULA CHIP */
+    .formula-chip {
+      display: inline-block;
+      background: rgba(0,255,136,0.05);
+      border: 1px solid rgba(0,255,136,0.2);
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-size: 11px;
+      color: var(--phosphor-dim);
+      letter-spacing: 1px;
+      font-family: 'VT323', monospace;
+      font-size: 14px;
+    }
+
+    /* ANIMATIONS */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .cursor { animation: blink 1s step-end infinite; }
+
+    /* SYSTEM OFFLINE overlay */
+    .offline-notice {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      font-family: 'VT323', monospace;
+      pointer-events: none;
+    }
+
+    .offline-notice.show { display: flex; }
+
+    .offline-text {
+      font-size: 48px;
+      color: var(--red);
+      text-shadow: 0 0 20px rgba(255,68,68,0.5);
+      letter-spacing: 8px;
+      animation: blink 1.5s step-end infinite;
+    }
+
+    .offline-sub {
+      font-size: 16px;
+      color: var(--text-dim);
+      letter-spacing: 4px;
+    }
+
+    /* HIGHLIGHT EFFECT for calc results */
+    @keyframes resultFlash {
+      0% { background: rgba(255,179,71,0.15); }
+      100% { background: #080a09; }
+    }
+
+    .result-flash { animation: resultFlash 0.6s ease forwards; }
+  </style>
+</head>
+<body>
+<div class="chassis">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="brand">
+      <span class="brand-label">Model CA-1 &mdash; Rev. 3.2</span>
+      <div class="brand-title">CIRCUIT AGENT</div>
+      <span class="brand-sub">Electronics Decision Engine &bull; V/I/R/C Analysis</span>
+    </div>
+    <div class="power-section">
+      <span class="power-label">Main Power</span>
+      <label class="power-toggle">
+        <input type="checkbox" id="powerSwitch" />
+        <span class="power-slider"></span>
+      </label>
+      <span class="power-status" id="powerStatus">OFFLINE</span>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-text" id="statusText">System offline — engage main power to initialize</div>
+    <div class="status-time" id="statusTime">00:00:00</div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid" id="mainGrid">
+
+    <!-- CALCULATOR PANEL -->
+    <div class="panel disabled" id="calcPanel">
+      <div class="panel-header">
+        <div class="panel-header-dot"></div>
+        <span class="panel-title">Calculator &mdash; Ohm's Law / RC</span>
+      </div>
+      <div class="panel-body">
+        <div class="calc-type-tabs">
+          <button class="tab active" data-tab="ohm">V/I/R</button>
+          <button class="tab" data-tab="power">Power</button>
+          <button class="tab" data-tab="cap">Capacitor</button>
+          <button class="tab" data-tab="series">Series</button>
+          <button class="tab" data-tab="parallel">Parallel</button>
+        </div>
+
+        <!-- OHM TAB -->
+        <div class="tab-content" id="tab-ohm">
+          <div class="ohm-diagram">
+            <div class="ohm-circle" id="vcircle">
+              <span class="ohm-circle-letter">V</span>
+              <span class="ohm-circle-sub">Volts</span>
+            </div>
+            <div class="ohm-eq">=</div>
+            <div class="ohm-circle" id="icicle">
+              <span class="ohm-circle-letter">I</span>
+              <span class="ohm-circle-sub">Amps</span>
+            </div>
+            <div class="ohm-eq">&times;</div>
+            <div class="ohm-circle" id="rcircle">
+              <span class="ohm-circle-letter">R</span>
+              <span class="ohm-circle-sub">Ohms</span>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field-row">
+              <div>
+                <label class="field-label">Solve For</label>
+                <select class="field-select" id="ohmSolve">
+                  <option value="V">Voltage (V)</option>
+                  <option value="I">Current (I)</option>
+                  <option value="R">Resistance (R)</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row" id="ohmFields">
+              <div>
+                <label class="field-label" id="ohmLabel1">Current (A)</label>
+                <input type="number" class="field-input" id="ohmIn1" placeholder="0.00" step="any" />
+              </div>
+              <div>
+                <label class="field-label" id="ohmLabel2">Resistance (Ω)</label>
+                <input type="number" class="field-input" id="ohmIn2" placeholder="0.00" step="any" />
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcOhm()">COMPUTE</button>
+          <div class="result-display" id="ohmResult">
+            <span class="result-label">Awaiting input<span class="cursor">_</span></span>
+          </div>
+        </div>
+
+        <!-- POWER TAB -->
+        <div class="tab-content" id="tab-power" style="display:none">
+          <div class="field-group">
+            <div class="field-row">
+              <div>
+                <label class="field-label">Solve For</label>
+                <select class="field-select" id="pwrSolve">
+                  <option value="P">Power (W)</option>
+                  <option value="V">Voltage (V)</option>
+                  <option value="I">Current (A)</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <div>
+                <label class="field-label" id="pwrLabel1">Voltage (V)</label>
+                <input type="number" class="field-input" id="pwrIn1" placeholder="0.00" step="any" />
+              </div>
+              <div>
+                <label class="field-label" id="pwrLabel2">Current (A)</label>
+                <input type="number" class="field-input" id="pwrIn2" placeholder="0.00" step="any" />
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcPower()">COMPUTE</button>
+          <div class="result-display" id="pwrResult">
+            <span class="result-label">Awaiting input<span class="cursor">_</span></span>
+          </div>
+        </div>
+
+        <!-- CAPACITOR TAB -->
+        <div class="tab-content" id="tab-cap" style="display:none">
+          <div class="field-group">
+            <div class="field-row">
+              <div>
+                <label class="field-label">Solve For</label>
+                <select class="field-select" id="capSolve">
+                  <option value="Q">Charge Q (C)</option>
+                  <option value="V">Voltage V</option>
+                  <option value="C">Capacitance (F)</option>
+                  <option value="E">Energy (J)</option>
+                  <option value="Xc">Reactance Xc (Ω)</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <div>
+                <label class="field-label" id="capLabel1">Capacitance (F)</label>
+                <input type="number" class="field-input" id="capIn1" placeholder="0.00" step="any" />
+              </div>
+              <div>
+                <label class="field-label" id="capLabel2">Voltage (V)</label>
+                <input type="number" class="field-input" id="capIn2" placeholder="0.00" step="any" />
+              </div>
+            </div>
+            <div id="capExtraRow" style="display:none">
+              <label class="field-label" id="capLabel3">Frequency (Hz)</label>
+              <input type="number" class="field-input" id="capIn3" placeholder="60" step="any" />
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcCap()">COMPUTE</button>
+          <div class="result-display" id="capResult">
+            <span class="result-label">Awaiting input<span class="cursor">_</span></span>
+          </div>
+        </div>
+
+        <!-- SERIES RESISTORS TAB -->
+        <div class="tab-content" id="tab-series" style="display:none">
+          <p class="field-label" style="margin-bottom:8px">Series Resistors (R_total = R1+R2+R3+...)</p>
+          <div class="field-row">
+            <div>
+              <label class="field-label">R1 (Ω)</label>
+              <input type="number" class="field-input" id="sr1" placeholder="0" step="any" />
+            </div>
+            <div>
+              <label class="field-label">R2 (Ω)</label>
+              <input type="number" class="field-input" id="sr2" placeholder="0" step="any" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div>
+              <label class="field-label">R3 (Ω)</label>
+              <input type="number" class="field-input" id="sr3" placeholder="0" step="any" />
+            </div>
+            <div>
+              <label class="field-label">R4 (Ω)</label>
+              <input type="number" class="field-input" id="sr4" placeholder="0" step="any" />
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcSeries()">COMPUTE</button>
+          <div class="result-display" id="seriesResult">
+            <span class="result-label">Awaiting input<span class="cursor">_</span></span>
+          </div>
+        </div>
+
+        <!-- PARALLEL RESISTORS TAB -->
+        <div class="tab-content" id="tab-parallel" style="display:none">
+          <p class="field-label" style="margin-bottom:8px">Parallel Resistors (1/R_total = 1/R1+1/R2+...)</p>
+          <div class="field-row">
+            <div>
+              <label class="field-label">R1 (Ω)</label>
+              <input type="number" class="field-input" id="pr1" placeholder="0" step="any" />
+            </div>
+            <div>
+              <label class="field-label">R2 (Ω)</label>
+              <input type="number" class="field-input" id="pr2" placeholder="0" step="any" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div>
+              <label class="field-label">R3 (Ω)</label>
+              <input type="number" class="field-input" id="pr3" placeholder="0" step="any" />
+            </div>
+            <div>
+              <label class="field-label">R4 (Ω)</label>
+              <input type="number" class="field-input" id="pr4" placeholder="0" step="any" />
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcParallel()">COMPUTE</button>
+          <div class="result-display" id="parallelResult">
+            <span class="result-label">Awaiting input<span class="cursor">_</span></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- LIVE METERS PANEL -->
+    <div class="panel disabled" id="metersPanel">
+      <div class="panel-header">
+        <div class="panel-header-dot"></div>
+        <span class="panel-title">Live Meters &mdash; Last Computed</span>
+      </div>
+      <div class="panel-body">
+        <div class="meters-grid">
+          <div class="meter-box">
+            <div class="meter-name">Voltage</div>
+            <div class="meter-value" id="mV">---</div>
+            <div class="meter-unit">Volts (V)</div>
+            <div class="meter-bar"><div class="meter-bar-fill" id="mVbar" style="width:0%"></div></div>
+          </div>
+          <div class="meter-box">
+            <div class="meter-name">Current</div>
+            <div class="meter-value" id="mI">---</div>
+            <div class="meter-unit">Amperes (A)</div>
+            <div class="meter-bar"><div class="meter-bar-fill" id="mIbar" style="width:0%"></div></div>
+          </div>
+          <div class="meter-box">
+            <div class="meter-name">Resistance</div>
+            <div class="meter-value" id="mR">---</div>
+            <div class="meter-unit">Ohms (Ω)</div>
+            <div class="meter-bar"><div class="meter-bar-fill" id="mRbar" style="width:0%"></div></div>
+          </div>
+          <div class="meter-box">
+            <div class="meter-name">Power</div>
+            <div class="meter-value" id="mP">---</div>
+            <div class="meter-unit">Watts (W)</div>
+            <div class="meter-bar"><div class="meter-bar-fill" id="mPbar" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <!-- DECISION STATUS -->
+        <div style="margin-top:14px; background:#080a09; border:1px solid var(--panel-border); border-radius:3px; padding:12px;">
+          <div class="field-label" style="margin-bottom:8px">Agent Decision / Safety Check</div>
+          <div id="decisionOutput" style="font-family:'VT323',monospace; font-size:15px; color:var(--text-dim); line-height:1.7;">
+            No data yet — run a calculation to receive agent analysis.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENT CHAT PANEL (full width) -->
+    <div class="panel agent-panel disabled" id="agentPanel">
+      <div class="panel-header">
+        <div class="panel-header-dot"></div>
+        <span class="panel-title">Agent Interface &mdash; Natural Language Query</span>
+      </div>
+      <div class="panel-body">
+        <div class="agent-chat" id="agentChat">
+          <div class="chat-line system"><span class="prompt">[SYS]</span> Agent offline. Engage main power.</div>
+        </div>
+        <div class="agent-input-row">
+          <input type="text" class="agent-input" id="agentInput"
+            placeholder="e.g. What voltage for 2A through 47 ohms? or What is the RC time constant for 100µF at 10kΩ?" />
+          <button class="send-btn" onclick="sendAgentQuery()">SEND</button>
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:var(--text-dim); letter-spacing:1px; line-height:1.8;">
+          Try: &nbsp;
+          <span class="formula-chip" onclick="quickQuery(this)">V across 47Ω with 0.5A</span> &nbsp;
+          <span class="formula-chip" onclick="quickQuery(this)">charge on 100µF at 5V</span> &nbsp;
+          <span class="formula-chip" onclick="quickQuery(this)">power from 12V 3A</span> &nbsp;
+          <span class="formula-chip" onclick="quickQuery(this)">time constant 10kΩ 470µF</span> &nbsp;
+          <span class="formula-chip" onclick="quickQuery(this)">is 500mA safe for 1/4W resistor at 10Ω?</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end main-grid -->
+</div><!-- end chassis -->
+
+<!-- OFFLINE OVERLAY -->
+<div class="offline-notice" id="offlineNotice">
+  <div class="offline-text">SYSTEM OFFLINE</div>
+  <div class="offline-sub">Toggle power switch to initialize</div>
+</div>
+
+<!-- CREATEOS BADGE -->
+<style>
+  #createos-badge {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 999px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    font-size: 11px;
+    font-weight: 500;
+    color: #374151;
+    text-decoration: none;
+    font-family: system-ui, sans-serif;
+  }
+  #createos-badge:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  #createos-badge img { width: 14px; height: 14px; }
+</style>
+<a id="createos-badge" href="https://createos.sh/app" target="_blank" rel="noopener noreferrer">
+  <img src="https://nodeops.network/SymbolBlack.svg" alt="" />
+  Built with CreateOS
+</a>
+
+<script>
+// ─── POWER SYSTEM ───────────────────────────────────────────────────────────
+let systemOn = false;
+let sessionStart = null;
+let timeInterval = null;
+
+const powerSwitch = document.getElementById('powerSwitch');
+const powerStatus = document.getElementById('powerStatus');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const statusTime = document.getElementById('statusTime');
+
+const panels = ['calcPanel','metersPanel','agentPanel'];
+
+powerSwitch.addEventListener('change', () => {
+  systemOn = powerSwitch.checked;
+  if (systemOn) {
+    bootSystem();
+  } else {
+    shutdownSystem();
+  }
+});
+
+function bootSystem() {
+  powerStatus.textContent = 'ONLINE';
+  powerStatus.classList.add('on');
+  statusDot.classList.add('active');
+  sessionStart = Date.now();
+
+  // Staggered panel enable
+  panels.forEach((id, i) => {
+    setTimeout(() => {
+      document.getElementById(id).classList.remove('disabled');
+    }, 200 + i * 150);
+  });
+
+  statusText.textContent = 'Initializing subsystems...';
+  setTimeout(() => statusText.textContent = 'All systems nominal — agent ready', 800);
+
+  timeInterval = setInterval(updateTime, 1000);
+  updateTime();
+
+  // Boot agent chat
+  const chat = document.getElementById('agentChat');
+  chat.innerHTML = '';
+  const bootLines = [
+    { cls: 'system', text: '[SYS] Power-on self test... PASS' },
+    { cls: 'system', text: '[SYS] Loading electronics knowledge base...' },
+    { cls: 'system', text: '[SYS] Ohm\'s Law engine: READY' },
+    { cls: 'system', text: '[SYS] Capacitor module: READY' },
+    { cls: 'system', text: '[SYS] Decision agent: ONLINE' },
+    { cls: 'agent', text: '[AGENT] Hello. I\'m ready to assist with circuit analysis. Describe your problem in plain English.' },
+  ];
+  bootLines.forEach((l, i) => {
+    setTimeout(() => appendChat(l.cls, l.text), 300 + i * 180);
+  });
+}
+
+function shutdownSystem() {
+  powerStatus.textContent = 'OFFLINE';
+  powerStatus.classList.remove('on');
+  statusDot.classList.remove('active');
+  statusText.textContent = 'System offline — engage main power to initialize';
+  statusTime.textContent = '00:00:00';
+
+  panels.forEach(id => document.getElementById(id).classList.add('disabled'));
+
+  clearInterval(timeInterval);
+  document.getElementById('agentChat').innerHTML =
+    '<div class="chat-line system"><span class="prompt">[SYS]</span> System powered down.</div>';
+}
+
+function updateTime() {
+  if (!sessionStart) return;
+  const s = Math.floor((Date.now() - sessionStart) / 1000);
+  const h = String(Math.floor(s / 3600)).padStart(2,'0');
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2,'0');
+  const sec = String(s % 60).padStart(2,'0');
+  statusTime.textContent = `${h}:${m}:${sec}`;
+}
+
+// ─── TABS ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x => x.style.display = 'none');
+    t.classList.add('active');
+    document.getElementById('tab-' + t.dataset.tab).style.display = 'block';
+  });
+});
+
+// Ohm solve-for dynamic labels
+document.getElementById('ohmSolve').addEventListener('change', function() {
+  const v = this.value;
+  const pairs = {
+    V: [['Current (A)', 'ohmIn1'], ['Resistance (Ω)', 'ohmIn2']],
+    I: [['Voltage (V)', 'ohmIn1'], ['Resistance (Ω)', 'ohmIn2']],
+    R: [['Voltage (V)', 'ohmIn1'], ['Current (A)', 'ohmIn2']],
+  };
+  document.getElementById('ohmLabel1').textContent = pairs[v][0][0];
+  document.getElementById('ohmLabel2').textContent = pairs[v][1][0];
+  highlightOhmCircle(v);
+});
+
+function highlightOhmCircle(solve) {
+  ['vcircle','icicle','rcircle'].forEach(id => document.getElementById(id).classList.remove('highlight'));
+  const map = { V: 'vcircle', I: 'icicle', R: 'rcircle' };
+  document.getElementById(map[solve]).classList.add('highlight');
+}
+
+document.getElementById('pwrSolve').addEventListener('change', function() {
+  const v = this.value;
+  const pairs = {
+    P: [['Voltage (V)', ''], ['Current (A)', '']],
+    V: [['Power (W)', ''], ['Current (A)', '']],
+    I: [['Power (W)', ''], ['Voltage (V)', '']],
+  };
+  document.getElementById('pwrLabel1').textContent = pairs[v][0][0];
+  document.getElementById('pwrLabel2').textContent = pairs[v][1][0];
+});
+
+document.getElementById('capSolve').addEventListener('change', function() {
+  const v = this.value;
+  const labels = {
+    Q: [['Capacitance (F)', 'Voltage (V)', false]],
+    V: [['Capacitance (F)', 'Charge Q (C)', false]],
+    C: [['Charge Q (C)', 'Voltage (V)', false]],
+    E: [['Capacitance (F)', 'Voltage (V)', false]],
+    Xc: [['Capacitance (F)', 'Frequency (Hz)', false]],
+  };
+  const l = labels[v][0];
+  document.getElementById('capLabel1').textContent = l[0];
+  document.getElementById('capLabel2').textContent = l[1];
+  document.getElementById('capExtraRow').style.display = 'none';
+});
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (Math.abs(n) >= 1e6) return (n/1e6).toPrecision(4) + 'M';
+  if (Math.abs(n) >= 1e3) return (n/1e3).toPrecision(4) + 'k';
+  if (Math.abs(n) < 0.001 && n !== 0) return (n*1e3).toPrecision(4) + 'm';
+  return n.toPrecision(5);
+}
+
+function showResult(elId, label, value, unit, detail='') {
+  const el = document.getElementById(elId);
+  el.classList.remove('result-flash');
+  void el.offsetWidth;
+  el.classList.add('result-flash');
+  el.innerHTML = `
+    <span class="result-label">${label}</span>
+    <span class="result-value">${fmt(value)} <small style="font-size:16px;color:var(--text-mid)">${unit}</small></span>
+    ${detail ? `<div class="result-detail">${detail}</div>` : ''}
+  `;
+}
+
+function showError(elId, msg) {
+  document.getElementById(elId).innerHTML = `<span class="result-error">⚠ ${msg}</span>`;
+}
+
+function updateMeters(V, I, R, P) {
+  if (V !== null) { document.getElementById('mV').textContent = fmt(V); setBar('mVbar', Math.min(V/500*100, 100)); }
+  if (I !== null) { document.getElementById('mI').textContent = fmt(I); setBar('mIbar', Math.min(I/20*100, 100)); }
+  if (R !== null) { document.getElementById('mR').textContent = fmt(R); setBar('mRbar', Math.min(Math.log10(R+1)/6*100, 100)); }
+  if (P !== null) { document.getElementById('mP').textContent = fmt(P); setBar('mPbar', Math.min(P/1000*100, 100)); }
+  runDecision(V, I, R, P);
+}
+
+function setBar(id, pct) {
+  document.getElementById(id).style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
+
+function runDecision(V, I, R, P) {
+  const lines = [];
+  if (V !== null && I !== null && R !== null && P !== null) {
+    // Safety checks
+    if (P > 1000) lines.push(`<span style="color:var(--red)">⚠ DANGER: Power ${fmt(P)}W exceeds typical component limits!</span>`);
+    else if (P > 100) lines.push(`<span style="color:var(--amber)">⚡ WARNING: High power dissipation ${fmt(P)}W — use heatsinking.</span>`);
+    else lines.push(`<span style="color:var(--phosphor)">✔ Power level ${fmt(P)}W within safe range.</span>`);
+
+    if (I > 10) lines.push(`<span style="color:var(--red)">⚠ DANGER: Current ${fmt(I)}A exceeds standard PCB trace limits!</span>`);
+    else if (I > 1) lines.push(`<span style="color:var(--amber)">⚡ NOTE: Current ${fmt(I)}A — verify wire gauge adequacy.</span>`);
+    else lines.push(`<span style="color:var(--phosphor)">✔ Current ${fmt(I)}A within normal range.</span>`);
+
+    if (V > 240) lines.push(`<span style="color:var(--red)">⚠ HIGH VOLTAGE: ${fmt(V)}V — extreme caution required.</span>`);
+    else if (V > 48) lines.push(`<span style="color:var(--amber)">⚡ NOTE: ${fmt(V)}V — observe electrical safety procedures.</span>`);
+    else lines.push(`<span style="color:var(--phosphor)">✔ Voltage ${fmt(V)}V is low-voltage safe.</span>`);
+
+    // Resistor suggestion
+    const wattage = P < 0.125 ? '1/8W' : P < 0.25 ? '1/4W' : P < 0.5 ? '1/2W' : P < 1 ? '1W' : `${Math.ceil(P*2)/2}W`;
+    lines.push(`<span style="color:var(--text-mid)">→ Suggested resistor rating: <b style="color:var(--amber)">${wattage}</b> (${R.toFixed(1)}Ω)</span>`);
+  } else {
+    lines.push('<span style="color:var(--text-dim)">Partial data — run a V/I/R calculation for full analysis.</span>');
+  }
+  document.getElementById('decisionOutput').innerHTML = lines.join('<br/>');
+}
+
+// ─── CALCULATORS ─────────────────────────────────────────────────────────────
+function calcOhm() {
+  const solve = document.getElementById('ohmSolve').value;
+  const a = parseFloat(document.getElementById('ohmIn1').value);
+  const b = parseFloat(document.getElementById('ohmIn2').value);
+  if (isNaN(a) || isNaN(b) || b <= 0 || a <= 0) return showError('ohmResult', 'Enter valid positive values in both fields.');
+
+  let V, I, R;
+  if (solve === 'V') { I = a; R = b; V = I * R; showResult('ohmResult', 'Voltage', V, 'V', `V = ${fmt(I)}A × ${fmt(R)}Ω`); }
+  else if (solve === 'I') { V = a; R = b; I = V / R; showResult('ohmResult', 'Current', I, 'A', `I = ${fmt(V)}V ÷ ${fmt(R)}Ω`); }
+  else { V = a; I = b; R = V / I; showResult('ohmResult', 'Resistance', R, 'Ω', `R = ${fmt(V)}V ÷ ${fmt(I)}A`); }
+
+  const Vcalc = (solve==='V') ? V : (solve==='I') ? a : a;
+  const Icalc = (solve==='I') ? I : (solve==='V') ? a : b;
+  const Rcalc = (solve==='R') ? R : b;
+  updateMeters(
+    solve==='V' ? V : solve==='I' ? a : a,
+    solve==='I' ? I : solve==='V' ? a : b,
+    solve==='R' ? R : b,
+    (solve==='V' ? V : solve==='I' ? a : a) * (solve==='I' ? I : solve==='V' ? a : b)
+  );
+}
+
+function calcPower() {
+  const solve = document.getElementById('pwrSolve').value;
+  const a = parseFloat(document.getElementById('pwrIn1').value);
+  const b = parseFloat(document.getElementById('pwrIn2').value);
+  if (isNaN(a) || isNaN(b) || a <= 0 || b <= 0) return showError('pwrResult', 'Enter valid positive values.');
+
+  let P, V, I;
+  if (solve === 'P') { V = a; I = b; P = V * I; showResult('pwrResult', 'Power', P, 'W', `P = ${fmt(V)}V × ${fmt(I)}A`); }
+  else if (solve === 'V') { P = a; I = b; V = P / I; showResult('pwrResult', 'Voltage', V, 'V', `V = ${fmt(P)}W ÷ ${fmt(I)}A`); }
+  else { P = a; V = b; I = P / V; showResult('pwrResult', 'Current', I, 'A', `I = ${fmt(P)}W ÷ ${fmt(V)}V`); }
+
+  const Vf = solve==='V' ? V : (solve==='P' ? a : b);
+  const If = solve==='I' ? I : (solve==='P' ? b : a);
+  const Pf = solve==='P' ? P : a;
+  const Rf = Vf > 0 && If > 0 ? Vf / If : null;
+  updateMeters(Vf, If, Rf, Pf);
+}
+
+function calcCap() {
+  const solve = document.getElementById('capSolve').value;
+  const a = parseFloat(document.getElementById('capIn1').value);
+  const b = parseFloat(document.getElementById('capIn2').value);
+  if (isNaN(a) || a <= 0) return showError('capResult', 'Enter valid capacitor value.');
+
+  if (solve === 'Q') {
+    if (isNaN(b) || b <= 0) return showError('capResult', 'Enter voltage.');
+    const Q = a * b;
+    showResult('capResult', 'Charge Q', Q, 'C', `Q = ${fmt(a)}F × ${fmt(b)}V`);
+  } else if (solve === 'V') {
+    if (isNaN(b) || b <= 0) return showError('capResult', 'Enter charge Q.');
+    const V = b / a;
+    showResult('capResult', 'Voltage', V, 'V', `V = ${fmt(b)}C ÷ ${fmt(a)}F`);
+  } else if (solve === 'C') {
+    if (isNaN(b) || b <= 0) return showError('capResult', 'Enter voltage.');
+    const C = a / b;
+    showResult('capResult', 'Capacitance', C, 'F', `C = ${fmt(a)}C ÷ ${fmt(b)}V`);
+  } else if (solve === 'E') {
+    if (isNaN(b) || b <= 0) return showError('capResult', 'Enter voltage.');
+    const E = 0.5 * a * b * b;
+    showResult('capResult', 'Energy', E, 'J', `E = ½ × ${fmt(a)}F × ${fmt(b)}²V`);
+  } else if (solve === 'Xc') {
+    if (isNaN(b) || b <= 0) return showError('capResult', 'Enter frequency (Hz).');
+    const Xc = 1 / (2 * Math.PI * b * a);
+    showResult('capResult', 'Reactance Xc', Xc, 'Ω', `Xc = 1/(2π × ${fmt(b)}Hz × ${fmt(a)}F)`);
+  }
+}
+
+function calcSeries() {
+  const vals = [sr1,sr2,sr3,sr4].map(id => parseFloat(document.getElementById(id).value)).filter(v => !isNaN(v) && v > 0);
+  if (vals.length < 2) return showError('seriesResult', 'Enter at least 2 resistor values.');
+  const total = vals.reduce((s,v) => s+v, 0);
+  showResult('seriesResult', 'Series Total', total, 'Ω', vals.map(fmt).join(' + ') + ' Ω');
+  updateMeters(null, null, total, null);
+}
+
+function calcParallel() {
+  const vals = [pr1,pr2,pr3,pr4].map(id => parseFloat(document.getElementById(id).value)).filter(v => !isNaN(v) && v > 0);
+  if (vals.length < 2) return showError('parallelResult', 'Enter at least 2 resistor values.');
+  const total = 1 / vals.reduce((s,v) => s + 1/v, 0);
+  showResult('parallelResult', 'Parallel Total', total, 'Ω', '1/(' + vals.map(v => '1/'+fmt(v)).join('+') + ') Ω');
+  updateMeters(null, null, total, null);
+}
+
+// ─── AGENT ───────────────────────────────────────────────────────────────────
+function appendChat(cls, text) {
+  const chat = document.getElementById('agentChat');
+  const div = document.createElement('div');
+  div.className = 'chat-line ' + cls;
+  const prefixes = { system: '[SYS]', agent: '[AGENT]', error: '[ERR]', success: '[OK]', user: '[YOU]' };
+  div.innerHTML = `<span class="prompt">${prefixes[cls] || '>'}</span> ${text}`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function quickQuery(el) {
+  if (!systemOn) return;
+  document.getElementById('agentInput').value = el.textContent;
+  sendAgentQuery();
+}
+
+function sendAgentQuery() {
+  if (!systemOn) { appendChat('error', 'System offline.'); return; }
+  const input = document.getElementById('agentInput');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  appendChat('user', q);
+  setTimeout(() => processAgentQuery(q), 300);
+}
+
+document.getElementById('agentInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendAgentQuery();
+});
+
+function processAgentQuery(q) {
+  const lower = q.toLowerCase();
+
+  // POWER keyword matching
+  if (/\b(power|watt)\b/.test(lower)) {
+    const vMatch = lower.match(/(\d+\.?\d*)\s*v(?:olt)?/);
+    const iMatch = lower.match(/(\d+\.?\d*)\s*a(?:mp)?/);
+    const pMatch = lower.match(/(\d+\.?\d*)\s*w(?:att)?/);
+    if (vMatch && iMatch) {
+      const V = parseFloat(vMatch[1]), I = parseFloat(iMatch[1]), P = V*I;
+      appendChat('agent', `P = V × I = ${fmt(V)}V × ${fmt(I)}A = <b>${fmt(P)}W</b>`);
+      updateMeters(V, I, V/I, P);
+      return;
+    }
+    if (vMatch && pMatch) {
+      const V = parseFloat(vMatch[1]), P = parseFloat(pMatch[1]), I = P/V;
+      appendChat('agent', `I = P ÷ V = ${fmt(P)}W ÷ ${fmt(V)}V = <b>${fmt(I)}A</b>`);
+      updateMeters(V, I, V/I, P);
+      return;
+    }
+  }
+
+  // VOLTAGE calculations
+  if (/\b(voltage|volt)\b/.test(lower)) {
+    const iMatch = lower.match(/(\d+\.?\d*)\s*(?:a(?:mp)?|ma)/);
+    const rMatch = lower.match(/(\d+\.?\d*)\s*(?:k)?(?:ohm|ω|Ω)/);
+    if (iMatch && rMatch) {
+      let I = parseFloat(iMatch[1]);
+      if (lower.match(/\d+\.?\d*\s*ma/)) I /= 1000;
+      let R = parseFloat(rMatch[1]);
+      if (lower.includes('k') && rMatch[0].toLowerCase().includes('k')) R *= 1000;
+      const V = I * R;
+      appendChat('agent', `V = I × R = ${fmt(I)}A × ${fmt(R)}Ω = <b>${fmt(V)}V</b>`);
+      updateMeters(V, I, R, V*I);
+      return;
+    }
+  }
+
+  // CURRENT calculations
+  if (/\bcurrent\b/.test(lower)) {
+    const vMatch = lower.match(/(\d+\.?\d*)\s*v(?:olt)?/);
+    const rMatch = lower.match(/(\d+\.?\d*)\s*(?:k)?(?:ohm|ω|Ω)/);
+    if (vMatch && rMatch) {
+      let R = parseFloat(rMatch[1]);
+      if (lower.includes('k') && rMatch[0].toLowerCase().includes('k')) R *= 1000;
+      const V = parseFloat(vMatch[1]), I = V/R;
+      appendChat('agent', `I = V ÷ R = ${fmt(V)}V ÷ ${fmt(R)}Ω = <b>${fmt(I)}A (${fmt(I*1000)}mA)</b>`);
+      updateMeters(V, I, R, V*I);
+      return;
+    }
+  }
+
+  // RESISTANCE
+  if (/\bresistance\b/.test(lower)) {
+    const vMatch = lower.match(/(\d+\.?\d*)\s*v(?:olt)?/);
+    const iMatch = lower.match(/(\d+\.?\d*)\s*(?:a(?:mp)?|ma)/);
+    if (vMatch && iMatch) {
+      let I = parseFloat(iMatch[1]);
+      if (lower.match(/\d+\.?\d*\s*ma/)) I /= 1000;
+      const V = parseFloat(vMatch[1]), R = V/I;
+      appendChat('agent', `R = V ÷ I = ${fmt(V)}V ÷ ${fmt(I)}A = <b>${fmt(R)}Ω</b>`);
+      updateMeters(V, I, R, V*I);
+      return;
+    }
+  }
+
+  // CHARGE Q = CV
+  if (/\bcharge\b/.test(lower)) {
+    const cMatch = lower.match(/(\d+\.?\d*)\s*(?:µ|u|micro)?f(?:arad)?/);
+    const vMatch = lower.match(/(\d+\.?\d*)\s*v(?:olt)?/);
+    if (cMatch && vMatch) {
+      let C = parseFloat(cMatch[1]);
+      if (/\d+\.?\d*\s*(?:µ|u|micro)f/.test(lower)) C *= 1e-6;
+      const V = parseFloat(vMatch[1]), Q = C*V;
+      appendChat('agent', `Q = C × V = ${fmt(C)}F × ${fmt(V)}V = <b>${fmt(Q)}C</b>`);
+      return;
+    }
+  }
+
+  // RC TIME CONSTANT
+  if (/\b(rc|time\s*constant|tau)\b/.test(lower)) {
+    const rMatch = lower.match(/(\d+\.?\d*)\s*(?:k)?(?:ohm|ω|Ω|kΩ)/i);
+    const cMatch = lower.match(/(\d+\.?\d*)\s*(?:µ|u|micro|m)?f(?:arad)?/i);
+    if (rMatch && cMatch) {
+      let R = parseFloat(rMatch[1]);
+      if (/k(?:ohm|ω|Ω)/i.test(rMatch[0])) R *= 1000;
+      let C = parseFloat(cMatch[1]);
+      if (/(?:µ|u|micro)f/i.test(cMatch[0])) C *= 1e-6;
+      if (/mf/i.test(cMatch[0]) && !/micro/i.test(cMatch[0])) C *= 1e-3;
+      const tau = R * C;
+      appendChat('agent', `τ = R × C = ${fmt(R)}Ω × ${fmt(C)}F = <b>${fmt(tau)}s</b>`);
+      appendChat('agent', `→ 63% charge at ${fmt(tau)}s, full charge ≈ ${fmt(5*tau)}s (5τ)`);
+      return;
+    }
+  }
+
+  // SAFETY CHECK
+  if (/\bsafe\b/.test(lower)) {
+    const iMatch = lower.match(/(\d+\.?\d*)\s*(?:a(?:mp)?|ma)/);
+    const rMatch = lower.match(/(\d+\.?\d*)\s*(?:k)?(?:ohm|ω|Ω)/);
+    const wMatch = lower.match(/(\d+\.?\d*)\s*\/?\s*(\d+)?\s*w(?:att)?/);
+    if (iMatch && rMatch && wMatch) {
+      let I = parseFloat(iMatch[1]);
+      if (/ma/i.test(iMatch[0])) I /= 1000;
+      let R = parseFloat(rMatch[1]);
+      const P_actual = I * I * R;
+      const P_rated = wMatch[2] ? parseFloat(wMatch[1]) / parseFloat(wMatch[2]) : parseFloat(wMatch[1]);
+      const safe = P_actual < P_rated * 0.5;
+      const cls = safe ? 'success' : (P_actual < P_rated ? 'agent' : 'error');
+      appendChat(cls, `P_actual = I²R = ${fmt(I)}² × ${fmt(R)} = ${fmt(P_actual)}W | Rated: ${fmt(P_rated)}W`);
+      appendChat(cls, safe ? `✔ SAFE — operating at ${((P_actual/P_rated)*100).toFixed(1)}% of rating.`
+        : P_actual < P_rated ? `⚡ MARGINAL — ${((P_actual/P_rated)*100).toFixed(1)}% of rating. Derate or upgrade.`
+        : `⚠ UNSAFE — exceeds rated power by ${(((P_actual-P_rated)/P_rated)*100).toFixed(0)}%! Use higher wattage.`);
+      updateMeters(I*R, I, R, P_actual);
+      return;
+    }
+  }
+
+  // CAPACITOR ENERGY
+  if (/\b(energy|joule)\b/.test(lower)) {
+    const cMatch = lower.match(/(\d+\.?\d*)\s*(?:µ|u|micro)?f(?:arad)?/);
+    const vMatch = lower.match(/(\d+\.?\d*)\s*v(?:olt)?/);
+    if (cMatch && vMatch) {
+      let C = parseFloat(cMatch[1]);
+      if (/(?:µ|u|micro)f/i.test(cMatch[0])) C *= 1e-6;
+      const V = parseFloat(vMatch[1]), E = 0.5 * C * V * V;
+      appendChat('agent', `E = ½CV² = 0.5 × ${fmt(C)}F × ${fmt(V)}² = <b>${fmt(E)}J</b>`);
+      return;
+    }
+  }
+
+  // REACTANCE Xc
+  if (/\b(reactance|xc)\b/.test(lower)) {
+    const cMatch = lower.match(/(\d+\.?\d*)\s*(?:µ|u|micro)?f(?:arad)?/);
+    const fMatch = lower.match(/(\d+\.?\d*)\s*(?:k)?hz/);
+    if (cMatch && fMatch) {
+      let C = parseFloat(cMatch[1]);
+      if (/(?:µ|u|micro)f/i.test(cMatch[0])) C *= 1e-6;
+      let F = parseFloat(fMatch[1]);
+      if (/khz/i.test(fMatch[0])) F *= 1000;
+      const Xc = 1 / (2 * Math.PI * F * C);
+      appendChat('agent', `Xc = 1/(2πfC) = 1/(2π × ${fmt(F)}Hz × ${fmt(C)}F) = <b>${fmt(Xc)}Ω</b>`);
+      return;
+    }
+  }
+
+  // SERIES PARALLEL detect
+  if (/series/.test(lower)) {
+    const nums = [...lower.matchAll(/(\d+\.?\d*)\s*(?:k)?(?:ohm|ω|Ω)/gi)].map(m => {
+      let v = parseFloat(m[1]);
+      if (/k(?:ohm|ω|Ω)/i.test(m[0])) v *= 1000;
+      return v;
+    });
+    if (nums.length >= 2) {
+      const total = nums.reduce((s,v)=>s+v,0);
+      appendChat('agent', `Series R_total = ${nums.map(fmt).join(' + ')} = <b>${fmt(total)}Ω</b>`);
+      updateMeters(null, null, total, null);
+      return;
+    }
+  }
+
+  if (/parallel/.test(lower)) {
+    const nums = [...lower.matchAll(/(\d+\.?\d*)\s*(?:k)?(?:ohm|ω|Ω)/gi)].map(m => {
+      let v = parseFloat(m[1]);
+      if (/k(?:ohm|ω|Ω)/i.test(m[0])) v *= 1000;
+      return v;
+    });
+    if (nums.length >= 2) {
+      const total = 1 / nums.reduce((s,v)=>s+1/v,0);
+      appendChat('agent', `Parallel R_total = 1/(${nums.map(v=>'1/'+fmt(v)).join('+')}) = <b>${fmt(total)}Ω</b>`);
+      updateMeters(null, null, total, null);
+      return;
+    }
+  }
+
+  // HELP
+  if (/\b(help|what|how|commands?)\b/.test(lower)) {
+    appendChat('agent', 'I understand natural-language circuit queries. Examples:');
+    appendChat('agent', '→ "voltage across 47Ω with 200mA" → applies V=IR');
+    appendChat('agent', '→ "power from 12V 2.5A" → applies P=VI');
+    appendChat('agent', '→ "time constant 10kΩ 470µF" → applies τ=RC');
+    appendChat('agent', '→ "is 500mA safe for 1/4W 10Ω resistor?" → safety analysis');
+    appendChat('agent', '→ "charge on 100µF at 5V" → applies Q=CV');
+    appendChat('agent', '→ "reactance 100µF at 60Hz" → applies Xc=1/2πfC');
+    return;
+  }
+
+  // Fallback
+  appendChat('agent', `I couldn\'t parse the circuit values from that query. Try including explicit numbers with units (V, A, Ω, kΩ, µF, Hz). Type "help" for examples.`);
+}
+</script>
+</body>
+</html>
